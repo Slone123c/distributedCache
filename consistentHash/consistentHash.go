@@ -8,15 +8,15 @@ import (
 
 type HashFunc func(data []byte) uint32
 
-type ConsistentHashMap struct {
+type Map struct {
 	hashFunc            HashFunc       // 哈希函数
 	virtualNodeReplicas int            // 虚拟节点倍数
 	hashRing            []int          // 哈希环
 	nodeMap             map[int]string // 虚拟节点与真实节点的映射表
 }
 
-func NewMap(replicas int, fn HashFunc) *ConsistentHashMap {
-	m := &ConsistentHashMap{
+func NewMap(replicas int, fn HashFunc) *Map {
+	m := &Map{
 		hashFunc:            fn,
 		virtualNodeReplicas: replicas,
 		nodeMap:             make(map[int]string),
@@ -30,13 +30,16 @@ func NewMap(replicas int, fn HashFunc) *ConsistentHashMap {
 }
 
 // Add 用于添加真实的节点，允许传入 0 或多个真实节点的名称
-func (m *ConsistentHashMap) Add(keys ...string) {
+func (m *Map) Add(keys ...string) {
+	// 遍历所有真实节点名称
 	for _, key := range keys {
 		// 为每个节点设置虚拟节点
-		// 虚拟节点的名称构成：strconv.Itoa(i) + key
 		for i := 0; i < m.virtualNodeReplicas; i++ {
+			// 计算虚拟节点的哈希值，虚拟节点的名称构成：strconv.Itoa(i) + key （由虚拟节点索引和真实节点名称组成）
 			hashValue := int(m.hashFunc([]byte(strconv.Itoa(i) + key)))
+			// 将计算出的哈希值添加到哈希环中
 			m.hashRing = append(m.hashRing, hashValue)
+			// 在虚拟节点与真实节点的映射表中，添加该虚拟节点和真实节点的映射关系
 			m.nodeMap[hashValue] = key
 		}
 	}
@@ -44,7 +47,7 @@ func (m *ConsistentHashMap) Add(keys ...string) {
 }
 
 // Get 用于从哈希环中选择节点
-func (m *ConsistentHashMap) Get(key string) string {
+func (m *Map) Get(key string) string {
 	if len(m.hashRing) == 0 {
 		return ""
 	}
@@ -57,8 +60,8 @@ func (m *ConsistentHashMap) Get(key string) string {
 		// 判断当前索引 i 所指向的哈希值是否大于或等于目标 hashValue
 		return m.hashRing[i] >= hashValue
 	})
-	// idx%len(m.hashRing) 确保索引在哈希环的有效范围内
-	// m.hashRing[idx%len(m.hashRing)] 根据索引取出哈希环中的哈希值
-	// m.nodeMap[m.hashRing[idx%len(m.hashRing)]] 使用哈希值作为 key，在节点映射表中查找真实的节点
+	// idx%len(m.hashRing): 确保索引在哈希环的有效范围内
+	// m.hashRing[idx%len(m.hashRing)]: 根据索引取出哈希环中的哈希值
+	// m.nodeMap[m.hashRing[idx%len(m.hashRing)]]: 使用哈希值作为 key，在节点映射表中查找真实的节点
 	return m.nodeMap[m.hashRing[idx%len(m.hashRing)]]
 }
