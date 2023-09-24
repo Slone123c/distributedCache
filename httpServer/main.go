@@ -34,7 +34,7 @@ func main() {
 	peers := cache.NewHTTPPool(addr)
 
 	// 打印日志，指示服务器运行地址
-	log.Println("geecache is running at", addr)
+	log.Println("cache is running at", addr)
 
 	// 启动 HTTP 服务器
 	log.Fatal(http.ListenAndServe(addr, peers))
