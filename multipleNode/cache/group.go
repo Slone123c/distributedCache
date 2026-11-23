@@ -10,7 +10,7 @@ type Group struct {
 	name      string
 	getter    Getter // 获取数据接口
 	mainCache cache
-	nodes     NodeSelector
+	nodes     NodeSelector // 一个实现了 SelectNode 方法的结构体
 }
 
 // Getter Getter接口定义了一个Get方法，
@@ -72,6 +72,7 @@ func GetGroup(name string) *Group {
 	return g
 }
 
+// Get 用于从缓存中获取值
 func (g *Group) Get(key string) (ByteView, error) {
 	if key == "" {
 		return ByteView{}, fmt.Errorf("key is required")
@@ -86,10 +87,14 @@ func (g *Group) Get(key string) (ByteView, error) {
 	return g.load(key)
 }
 
+// RegisterNodes 用于将负责节点选择的对象注册到一个缓存 Group 当中
 func (g *Group) RegisterNodes(nodes NodeSelector) {
+	// 如果 g.nodes 已经设置过，那么将会触发 panic
+	// 这是为了确保一个 Group 只能有一个节点选择器（NodeSelector）
 	if g.nodes != nil {
 		panic("Register Node called more than once")
 	}
+	// 将传入的 nodes 对象设置为该 Group 的节点选择器
 	g.nodes = nodes
 }
 
@@ -113,6 +118,7 @@ func (g *Group) load(key string) (value ByteView, err error) {
 	return g.getLocally(key)
 }
 
+// getLocally 用于当节点没有获取到数据时从本地获取
 func (g *Group) getLocally(key string) (ByteView, error) {
 	bytes, err := g.getter.Get(key) // 调用 getter 接口来获取数据
 	if err != nil {
@@ -123,10 +129,12 @@ func (g *Group) getLocally(key string) (ByteView, error) {
 	return value, nil
 }
 
+// populateCache 用于将键值存储到缓存中
 func (g *Group) populateCache(key string, value ByteView) {
 	g.mainCache.add(key, value) // 将 key-value 对添加到主缓存中
 }
 
+// getFromNode 用于从指定的节点获取数据
 func (g *Group) getFromNode(node NodeGetter, key string) (ByteView, error) {
 	bytes, err := node.Get(g.name, key) // 从选定的节点获取数据
 	if err != nil {
